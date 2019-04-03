@@ -17,6 +17,7 @@ parser.add_argument("--is_hyper", default=1, type=int, help="use hypercolumn or 
 parser.add_argument("--is_training", default=1, help="training or testing")
 parser.add_argument("--continue_training", action="store_true", help="search for checkpoint in the subfolder specified by `task` argument")
 ARGS = parser.parse_args()
+print(ARGS)
 
 task=ARGS.task
 is_training=ARGS.is_training==1
@@ -54,7 +55,7 @@ def get_weight_bias(vgg_layers,i):
     bias=vgg_layers[i][0][0][2][0][1]
     bias=tf.constant(np.reshape(bias,(bias.size)))
     return weights,bias
-    
+
 def lrelu(x):
     return tf.maximum(x*0.2,x)
 
@@ -148,13 +149,13 @@ g_mask=np.dstack((g_mask,g_mask,g_mask))
 def syn_data(t,r,sigma):
     t=np.power(t,2.2)
     r=np.power(r,2.2)
-    
+
     sz=int(2*np.ceil(2*sigma)+1)
     r_blur=cv2.GaussianBlur(r,(sz,sz),sigma,sigma,0)
     blend=r_blur+t
-    
+
     att=1.08+np.random.random()/10.0
-    
+
     for i in range(3):
         maski=blend[:,:,i]>1
         mean_i=max(1.,np.sum(blend[:,:,i]*maski)/(maski.sum()+1e-6))
@@ -169,7 +170,7 @@ def syn_data(t,r,sigma):
     alpha2 = 1-np.random.random()/5.0;
     r_blur_mask=np.multiply(r_blur,alpha1)
     blend=r_blur_mask+t*alpha2
-    
+
     t=np.power(t,1/2.2)
     r_blur_mask=np.power(r_blur_mask,1/2.2)
     blend=np.power(blend,1/2.2)
@@ -196,13 +197,13 @@ def compute_percep_loss(input, output, reuse=False):
 def compute_exclusion_loss(img1,img2,level=1):
     gradx_loss=[]
     grady_loss=[]
-    
+
     for l in range(level):
         gradx1, grady1=compute_gradient(img1)
         gradx2, grady2=compute_gradient(img2)
         alphax=2.0*tf.reduce_mean(tf.abs(gradx1))/tf.reduce_mean(tf.abs(gradx2))
         alphay=2.0*tf.reduce_mean(tf.abs(grady1))/tf.reduce_mean(tf.abs(grady2))
-        
+
         gradx1_s=(tf.nn.sigmoid(gradx1)*2)-1
         grady1_s=(tf.nn.sigmoid(grady1)*2)-1
         gradx2_s=(tf.nn.sigmoid(gradx2*alphax)*2)-1
@@ -230,12 +231,12 @@ with tf.variable_scope(tf.get_variable_scope()):
     # build the model
     network=build(input)
     transmission_layer, reflection_layer=tf.split(network, num_or_size_splits=2, axis=3)
-    
+
     # Perceptual Loss
     loss_percep_t=compute_percep_loss(transmission_layer, target)
     loss_percep_r=tf.where(issyn, compute_percep_loss(reflection_layer, reflection, reuse=True), 0.)
     loss_percep=tf.where(issyn, loss_percep_t+loss_percep_r, loss_percep_t)
-    
+
     # Adversarial Loss
     with tf.variable_scope("discriminator"):
         predict_real,pred_real_dict = build_discriminator(input,target)
@@ -244,10 +245,10 @@ with tf.variable_scope(tf.get_variable_scope()):
 
     d_loss=(tf.reduce_mean(-(tf.log(predict_real + EPS) + tf.log(1 - predict_fake + EPS)))) * 0.5
     g_loss=tf.reduce_mean(-tf.log(predict_fake + EPS))
-    
+
     # L1 loss on reflection image
     loss_l1_r=tf.where(issyn,compute_l1_loss(reflection_layer, reflection),0)
-    
+
     # Gradient loss
     loss_gradx,loss_grady=compute_exclusion_loss(transmission_layer,reflection_layer,level=3)
     loss_gradxy=tf.reduce_sum(sum(loss_gradx)/3.)+tf.reduce_sum(sum(loss_grady)/3.)
@@ -277,7 +278,7 @@ if ckpt and continue_training:
     print('loaded '+ckpt.model_checkpoint_path)
     saver_restore.restore(sess,ckpt.model_checkpoint_path)
 # test doesn't need to load discriminator
-else:
+elif ckpt is not None:
     saver_restore=tf.train.Saver([var for var in tf.trainable_variables() if 'discriminator' not in var.name])
     print('loaded '+ckpt.model_checkpoint_path)
     saver_restore.restore(sess,ckpt.model_checkpoint_path)
@@ -305,10 +306,12 @@ if is_training:
                         image2.append(path_output2)
         return input_names,image1,image2
 
-    _,syn_image1_list,syn_image2_list=prepare_data(train_syn_root) # image pairs for generating synthetic training images
-    input_real_names,output_real_names1,output_real_names2=prepare_data(train_real_root) # no reflection ground truth for real images
+    _, syn_image1_list, syn_image2_list = prepare_data(train_syn_root) # image pairs for generating synthetic training images
+    input_real_names, output_real_names1, output_real_names2 = prepare_data(train_real_root) # no reflection ground truth for real images
+    print(len(syn_image1_list), len(syn_image2_list))
+    print(len(input_real_names), len(output_real_names1), len(output_real_names2))
     print("[i] Total %d training images, first path of real image is %s." % (len(syn_image1_list)+len(output_real_names1), input_real_names[0]))
-    
+
     num_train=len(syn_image1_list)+len(output_real_names1)
     all_l=np.zeros(num_train, dtype=float)
     all_percep=np.zeros(num_train, dtype=float)
@@ -328,12 +331,13 @@ if is_training:
                 magic=np.random.random()
                 if magic < 0.7: # choose from synthetic dataset
                     is_syn=True
-                    syn_image1=cv2.imread(syn_image1_list[id],-1)
+                    _id=id%len(syn_image1_list)
+                    syn_image1=cv2.imread(syn_image1_list[_id],-1)
                     neww=np.random.randint(256, 480)
                     newh=round((neww/syn_image1.shape[1])*syn_image1.shape[0])
                     output_image_t=cv2.resize(np.float32(syn_image1),(neww,newh),cv2.INTER_CUBIC)/255.0
-                    output_image_r=cv2.resize(np.float32(cv2.imread(syn_image2_list[id],-1)),(neww,newh),cv2.INTER_CUBIC)/255.0
-                    file=os.path.splitext(os.path.basename(syn_image1_list[id]))[0]
+                    output_image_r=cv2.resize(np.float32(cv2.imread(syn_image2_list[_id],-1)),(neww,newh),cv2.INTER_CUBIC)/255.0
+                    file=os.path.splitext(os.path.basename(syn_image1_list[_id]))[0]
                     sigma=k_sz[np.random.randint(0, len(k_sz))]
                     if np.mean(output_image_t)*1/2 > np.mean(output_image_r):
                         continue
@@ -352,7 +356,7 @@ if is_training:
                 input_images[id]=np.expand_dims(input_image,axis=0)
                 output_images_t[id]=np.expand_dims(output_image_t,axis=0)
                 output_images_r[id]=np.expand_dims(output_image_r,axis=0)
-                
+
                 # remove some degenerated images (low-light or over-saturated images), heuristically set
                 if output_images_r[id].max() < 0.15 or output_images_t[id].max() < 0.15:
                     print("Invalid reflection file %s (degenerate channel)" % (file))
@@ -360,7 +364,7 @@ if is_training:
                 if input_images[id].max() < 0.1:
                     print("Invalid file %s (degenerate image)" % (file))
                     continue
-                
+
                 # alternate training, update discriminator every two iterations
                 if cnt%2==0:
                     fetch_list=[d_opt]
@@ -416,8 +420,8 @@ else:
         return input_names
 
     # Please replace with your own test image path
-    test_path = ["./test_images/CEILNet/"] #["./test_images/real/"]
-    subtask="CEILNet" # if you want to save different testset separately
+    test_path = ["./test_images/real_gbv/"] #["./test_images/real/"]
+    subtask="real_gbv" # if you want to save different testset separately
     val_names=prepare_data_test(test_path)
 
     for val_path in val_names:
