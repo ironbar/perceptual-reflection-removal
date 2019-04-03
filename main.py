@@ -16,6 +16,7 @@ parser.add_argument("--save_model_freq", default=1, type=int, help="frequency to
 parser.add_argument("--is_hyper", default=1, type=int, help="use hypercolumn or not")
 parser.add_argument("--is_training", default=1, help="training or testing")
 parser.add_argument("--continue_training", action="store_true", help="search for checkpoint in the subfolder specified by `task` argument")
+parser.add_argument("--data_syn_ratio", default=0.7, type=float, help="This controls how frequently synthetic data is used")
 ARGS = parser.parse_args()
 print(ARGS)
 
@@ -329,7 +330,7 @@ if is_training:
             st=time.time()
             if input_images[id] is None:
                 magic=np.random.random()
-                if magic < 0.7: # choose from synthetic dataset
+                if magic < ARGS.data_syn_ratio: # choose from synthetic dataset
                     is_syn=True
                     _id=id%len(syn_image1_list)
                     syn_image1=cv2.imread(syn_image1_list[_id],-1)
