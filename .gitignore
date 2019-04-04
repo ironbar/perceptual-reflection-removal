@@ -1,0 +1,5 @@
+test_images/*
+test_results/*
+trainings/*
+pre-trained/*
+*.pyc

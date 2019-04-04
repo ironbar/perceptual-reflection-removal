@@ -35,6 +35,12 @@ parser.add_argument("--n_images_epoch", default=-1, type=int,
                     help="Number of images per epoch, if not given it will be the sum of synthetic and real")
 parser.add_argument("--max_epochs", default=100, type=int,
                     help="Maximum number of epochs")
+parser.add_argument("--data_test_dir", default="./test_images/real/",
+                    help="path to test dataset for making predictions")
+parser.add_argument("--output_folder_name", default="CEILNet",
+                    help="Name of folder for saving results")
+parser.add_argument("--lr", default=[0.0002, 0.0001], type=float, nargs=2,
+                    help="Learning rate for generator and discriminator")
 
 ARGS = parser.parse_args()
 print(ARGS)
@@ -294,6 +300,15 @@ def compute_gradient(img):
     grady = img[:, :, 1:, :]-img[:, :, :-1, :]
     return gradx, grady
 
+def log_train_evolution(task, epoch, cnt, all_percep, all_grad):
+    log_path = "%s/train_evolution.csv" % task
+    if not os.path.exists(log_path):
+        with open(log_path, 'w') as f:
+            f.write('epoch\titeration\tperceptual_loss\tall_loss\n')
+    text = '%d\t%d\t%.2f\t%.2f\n' %(
+        epoch, cnt, np.mean(all_percep[np.where(all_percep)]), np.mean(all_grad[np.where(all_grad)]))
+    with open(log_path, 'a') as f:
+        f.write(text)
 
 # set up the model and define the graph
 with tf.variable_scope(tf.get_variable_scope()):
@@ -340,9 +355,10 @@ with tf.variable_scope(tf.get_variable_scope()):
 train_vars = tf.trainable_variables()
 d_vars = [var for var in train_vars if 'discriminator' in var.name]
 g_vars = [var for var in train_vars if 'g_' in var.name]
-g_opt = tf.train.AdamOptimizer(learning_rate=0.0002).minimize(
+# TODO: allow to modify the lr during train. https://github.com/ibab/tensorflow-wavenet/issues/267
+g_opt = tf.train.AdamOptimizer(learning_rate=ARGS.lr[0]).minimize(
     loss*100+g_loss, var_list=g_vars)  # optimizer for the generator
-d_opt = tf.train.AdamOptimizer(learning_rate=0.0001).minimize(
+d_opt = tf.train.AdamOptimizer(learning_rate=ARGS.lr[1]).minimize(
     d_loss, var_list=d_vars)  # optimizer for the discriminator
 
 for var in tf.trainable_variables():
@@ -499,33 +515,35 @@ if is_training:
                        np.mean(all_percep[np.where(all_percep)]), np.mean(
                            all_grad[np.where(all_grad)]),
                        time.time()-st))
+                log_train_evolution(task, epoch, cnt, all_percep, all_grad)
                 cnt += 1
                 input_images[id] = 1.
                 output_images_t[id] = 1.
                 output_images_r[id] = 1.
 
         # save model and images if required
+        epoch_folder = "%s/%05d" % (task, epoch)
         if epoch % ARGS.save_model_freq == 0 or epoch % ARGS.save_images_freq == 0:
-            os.makedirs("%s/%04d" % (task, epoch))
+            os.makedirs(epoch_folder)
         if epoch % ARGS.save_model_freq == 0:
             print('Saving the model')
             saver.save(sess, "%s/model.ckpt" % task)
         if epoch % ARGS.save_model_freq_epoch == 0:
             print('Saving the epoch model')
-            saver.save(sess, "%s/%04d/model.ckpt" % (task, epoch))
+            saver.save(sess, "%s/model.ckpt" % (epoch_folder))
         if epoch % ARGS.save_images_freq == 0:
             fileid = os.path.splitext(os.path.basename(file))[0]
-            if not os.path.isdir("%s/%04d/%s" % (task, epoch, fileid)):
-                os.makedirs("%s/%04d/%s" % (task, epoch, fileid))
+            if not os.path.isdir("%s/%s" % (epoch_folder, fileid)):
+                os.makedirs("%s/%s" % (epoch_folder, fileid))
             pred_image_t = np.minimum(np.maximum(pred_image_t, 0.0), 1.0)*255.0
             pred_image_r = np.minimum(np.maximum(pred_image_r, 0.0), 1.0)*255.0
             print("shape of outputs: ", pred_image_t.shape, pred_image_r.shape)
-            cv2.imwrite("%s/%04d/%s/int_t.png" % (task, epoch, fileid),
+            cv2.imwrite("%s/%s/int_t.png" % (epoch_folder, fileid),
                         np.uint8(np.squeeze(input_image*255.0)))
-            cv2.imwrite("%s/%04d/%s/out_t.png" %
-                        (task, epoch, fileid), np.uint8(np.squeeze(pred_image_t)))
-            cv2.imwrite("%s/%04d/%s/out_r.png" %
-                        (task, epoch, fileid), np.uint8(np.squeeze(pred_image_r)))
+            cv2.imwrite("%s/%s/out_t.png" %
+                        (epoch_folder, fileid), np.uint8(np.squeeze(pred_image_t)))
+            cv2.imwrite("%s/%s/out_r.png" %
+                        (epoch_folder, fileid), np.uint8(np.squeeze(pred_image_r)))
 # To test the model on images with reflection
 else:
     def prepare_data_test(test_path):
@@ -538,8 +556,8 @@ else:
         return input_names
 
     # Please replace with your own test image path
-    test_path = ["./test_images/real_gbv/"]  # ["./test_images/real/"]
-    subtask = "real_gbv"  # if you want to save different testset separately
+    test_path = [ARGS.data_test_dir]
+    subtask = ARGS.output_folder_name  # if you want to save different testset separately
     val_names = prepare_data_test(test_path)
 
     for val_path in val_names:
