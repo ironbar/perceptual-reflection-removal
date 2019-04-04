@@ -347,12 +347,12 @@ if is_training:
                 magic=np.random.random()
                 if magic < ARGS.data_syn_ratio: # choose from synthetic dataset
                     is_syn=True
-                    _id=id%len(syn_image1_list)
-                    syn_image1=cv2.imread(syn_image1_list[_id],-1)
+                    _id = np.random.randint(len(syn_image1_list))
+                    syn_image1=cv2.imread(syn_image1_list[_id], -1)
                     neww=np.random.randint(256, 480)
                     newh=round((neww/syn_image1.shape[1])*syn_image1.shape[0])
                     output_image_t=cv2.resize(np.float32(syn_image1),(neww,newh),cv2.INTER_CUBIC)/255.0
-                    output_image_r=cv2.resize(np.float32(cv2.imread(syn_image2_list[_id],-1)),(neww,newh),cv2.INTER_CUBIC)/255.0
+                    output_image_r=cv2.resize(np.float32(cv2.imread(np.random.choice(syn_image2_list),-1)),(neww,newh),cv2.INTER_CUBIC)/255.0
                     file=os.path.splitext(os.path.basename(syn_image1_list[_id]))[0]
                     sigma=k_sz[np.random.randint(0, len(k_sz))]
                     if np.mean(output_image_t)*1/2 > np.mean(output_image_r):
@@ -360,7 +360,7 @@ if is_training:
                     _,output_image_r,input_image=syn_data(output_image_t,output_image_r,sigma)
                 else: # choose from real dataste
                     is_syn=False
-                    _id=id%len(input_real_names)
+                    _id = np.random.randint(len(input_real_names))
                     inputimg = cv2.imread(input_real_names[_id],-1)
                     file=os.path.splitext(os.path.basename(input_real_names[_id]))[0]
                     neww=np.random.randint(256, 480)
