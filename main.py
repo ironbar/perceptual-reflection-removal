@@ -14,6 +14,7 @@ parser.add_argument("--task", default="pre-trained", help="path to folder contai
 parser.add_argument("--data_syn_dir", default="", help="path to synthetic dataset")
 parser.add_argument("--data_real_dir", default="", help="path to real dataset")
 parser.add_argument("--save_model_freq", default=1, type=int, help="frequency to save model")
+parser.add_argument("--save_images_freq", default=1, type=int, help="frequency to save images")
 parser.add_argument("--is_hyper", default=1, type=int, help="use hypercolumn or not")
 parser.add_argument("--is_training", default=1, help="training or testing")
 parser.add_argument("--continue_training", action="store_true", help="search for checkpoint in the subfolder specified by `task` argument")
@@ -409,12 +410,13 @@ if is_training:
                 output_images_t[id]=1.
                 output_images_r[id]=1.
 
-        # save model and images every epoch
-        if epoch % ARGS.save_model_freq == 0:
+        # save model and images if required
+        if epoch % ARGS.save_model_freq == 0 or epoch % ARGS.save_images_freq == 0:
             os.makedirs("%s/%04d"%(task,epoch))
+        if epoch % ARGS.save_model_freq == 0:
             saver.save(sess,"%s/model.ckpt"%task)
             saver.save(sess,"%s/%04d/model.ckpt"%(task,epoch))
-
+        if epoch % ARGS.save_images_freq == 0:
             fileid = os.path.splitext(os.path.basename(file))[0]
             if not os.path.isdir("%s/%04d/%s" % (task, epoch, fileid)):
                 os.makedirs("%s/%04d/%s" % (task, epoch, fileid))
