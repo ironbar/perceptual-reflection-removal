@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 from discriminator import build_discriminator
 import scipy.stats as st
 import argparse
+import glob
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--task", default="pre-trained", help="path to folder containing the model")
@@ -310,7 +311,14 @@ if is_training:
                         image2.append(path_output2)
         return input_names,image1,image2
 
-    _, syn_image1_list, syn_image2_list = prepare_data(train_syn_root) # image pairs for generating synthetic training images
+    def prepare_synthetic_data(train_path):
+        transmission_images = glob.glob(train_path + "transmission_layer/*")
+        transmission_images = [name for name in transmission_images if is_image_file(name)]
+        reflection_images = glob.glob(train_path + "reflection_layer/*")
+        reflection_images = [name for name in reflection_images if is_image_file(name)]
+        return transmission_images, reflection_images
+
+    syn_image1_list, syn_image2_list = prepare_synthetic_data(train_syn_root[0]) # image pairs for generating synthetic training images
     input_real_names, output_real_names1, output_real_names2 = prepare_data(train_real_root) # no reflection ground truth for real images
     print(len(syn_image1_list), len(syn_image2_list))
     print(len(input_real_names), len(output_real_names1), len(output_real_names2))
@@ -320,6 +328,7 @@ if is_training:
         num_train = len(syn_image1_list)+len(output_real_names1)
     else:
         num_train = ARGS.n_images_epoch
+    print("[i] Number of images per epoch: %i" % num_train)
     all_l=np.zeros(num_train, dtype=float)
     all_percep=np.zeros(num_train, dtype=float)
     all_grad=np.zeros(num_train, dtype=float)
