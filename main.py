@@ -18,6 +18,7 @@ parser.add_argument("--is_training", default=1, help="training or testing")
 parser.add_argument("--continue_training", action="store_true", help="search for checkpoint in the subfolder specified by `task` argument")
 parser.add_argument("--data_syn_ratio", default=0.7, type=float, help="This controls how frequently synthetic data is used")
 parser.add_argument("--n_images_epoch", default=-1, type=int, help="Number of images per epoch, if not given it will be the sum of synthetic and real")
+parser.add_argument("--max_epochs", default=100, type=int, help="Maximum number of epochs")
 
 ARGS = parser.parse_args()
 print(ARGS)
@@ -286,7 +287,7 @@ elif ckpt is not None:
     print('loaded '+ckpt.model_checkpoint_path)
     saver_restore.restore(sess,ckpt.model_checkpoint_path)
 
-maxepoch=100
+maxepoch=ARGS.max_epochs
 k_sz=np.linspace(1,5,80) # for synthetic images
 if is_training:
     # please follow the dataset directory setup in README
@@ -323,7 +324,7 @@ if is_training:
     all_percep=np.zeros(num_train, dtype=float)
     all_grad=np.zeros(num_train, dtype=float)
     all_g=np.zeros(num_train, dtype=float)
-    for epoch in range(1,maxepoch):
+    for epoch in range(1, maxepoch):
         input_images=[None]*num_train
         output_images_t=[None]*num_train
         output_images_r=[None]*num_train
