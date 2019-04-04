@@ -17,6 +17,8 @@ parser.add_argument("--is_hyper", default=1, type=int, help="use hypercolumn or 
 parser.add_argument("--is_training", default=1, help="training or testing")
 parser.add_argument("--continue_training", action="store_true", help="search for checkpoint in the subfolder specified by `task` argument")
 parser.add_argument("--data_syn_ratio", default=0.7, type=float, help="This controls how frequently synthetic data is used")
+parser.add_argument("--n_images_epoch", default=-1, type=int, help="Number of images per epoch, if not given it will be the sum of synthetic and real")
+
 ARGS = parser.parse_args()
 print(ARGS)
 
@@ -313,7 +315,10 @@ if is_training:
     print(len(input_real_names), len(output_real_names1), len(output_real_names2))
     print("[i] Total %d training images, first path of real image is %s." % (len(syn_image1_list)+len(output_real_names1), input_real_names[0]))
 
-    num_train=len(syn_image1_list)+len(output_real_names1)
+    if ARGS.n_images_epoch == -1:
+        num_train = len(syn_image1_list)+len(output_real_names1)
+    else:
+        num_train = ARGS.n_images_epoch
     all_l=np.zeros(num_train, dtype=float)
     all_percep=np.zeros(num_train, dtype=float)
     all_grad=np.zeros(num_train, dtype=float)
@@ -400,7 +405,7 @@ if is_training:
             saver.save(sess,"%s/model.ckpt"%task)
             saver.save(sess,"%s/%04d/model.ckpt"%(task,epoch))
 
-            fileid = os.path.splitext(os.path.basename(syn_image1_list[id]))[0]
+            fileid = os.path.splitext(os.path.basename(file))[0]
             if not os.path.isdir("%s/%04d/%s" % (task, epoch, fileid)):
                 os.makedirs("%s/%04d/%s" % (task, epoch, fileid))
             pred_image_t=np.minimum(np.maximum(pred_image_t,0.0),1.0)*255.0
