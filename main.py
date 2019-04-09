@@ -20,6 +20,8 @@ parser.add_argument("--data_syn_dir", default="",
 parser.add_argument("--data_real_dir", default="", help="path to real dataset")
 parser.add_argument("--save_model_freq", default=1,
                     type=int, help="frequency to save model")
+parser.add_argument("--discriminator_update_freq", default=2,
+                    type=int, help="frequency to update discriminator weights")
 parser.add_argument("--save_model_freq_epoch", default=10,
                     type=int, help="frequency to save model")
 parser.add_argument("--save_images_freq", default=1,
@@ -438,7 +440,8 @@ if is_training:
         output_images_t = [None]*num_train
         output_images_r = [None]*num_train
 
-        if os.path.isdir("%s/%04d" % (task, epoch)):
+        epoch_folder = "%s/%05d" % (task, epoch)
+        if os.path.isdir(epoch_folder):
             continue
         cnt = 0
         for id in np.random.permutation(num_train):
@@ -490,7 +493,7 @@ if is_training:
                     continue
 
                 # alternate training, update discriminator every two iterations
-                if cnt % 2 == 0:
+                if cnt % ARGS.discriminator_update_freq == 0:
                     fetch_list = [d_opt]
                     # update D
                     _ = sess.run(
@@ -515,14 +518,13 @@ if is_training:
                        np.mean(all_percep[np.where(all_percep)]), np.mean(
                            all_grad[np.where(all_grad)]),
                        time.time()-st))
-                log_train_evolution(task, epoch, cnt, all_percep, all_grad)
                 cnt += 1
                 input_images[id] = 1.
                 output_images_t[id] = 1.
                 output_images_r[id] = 1.
 
+        log_train_evolution(task, epoch, cnt, all_percep, all_grad)
         # save model and images if required
-        epoch_folder = "%s/%05d" % (task, epoch)
         if epoch % ARGS.save_model_freq == 0 or epoch % ARGS.save_images_freq == 0:
             os.makedirs(epoch_folder)
         if epoch % ARGS.save_model_freq == 0:
