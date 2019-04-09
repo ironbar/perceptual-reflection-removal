@@ -523,10 +523,10 @@ if is_training:
                 output_images_t[id] = 1.
                 output_images_r[id] = 1.
 
-        log_train_evolution(task, epoch, cnt, all_percep, all_grad)
         # save model and images if required
         if epoch % ARGS.save_model_freq == 0 or epoch % ARGS.save_images_freq == 0:
             os.makedirs(epoch_folder)
+        log_train_evolution(task, epoch, cnt, all_percep, all_grad)
         if epoch % ARGS.save_model_freq == 0:
             print('Saving the model')
             saver.save(sess, "%s/model.ckpt" % task)
